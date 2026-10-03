@@ -1,0 +1,164 @@
+---
+title: "Text as Data_hw_2"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(quanteda)
+```
+
+```{r}
+circle_raw <- read_file("A07594__Circle_of_Commerce.txt")
+free_trade_raw <- read_file("B14801__Free_Trade.txt")
+a06785_raw <- read_file("A06785.txt")
+
+raw_corpus <- tibble(
+  doc_title = c("A07594__Circle_of_Commerce", "B14801__Free_Trade", "A06785"),
+  text = c(circle_raw, free_trade_raw, a06785_raw)
+)
+
+glimpse(raw_corpus)
+```
+
+```{r}
+cleaned_tokens <- raw_corpus %>%
+  mutate(text = str_replace_all(text, "ſ", "s")) %>%
+  unnest_tokens(word, text, to_lower = TRUE) %>%
+  anti_join(stop_words, by = "word")
+```
+
+```{r}
+sentiment_words_raw <- cleaned_tokens %>%
+  filter(doc_title %in% c("A07594__Circle_of_Commerce", "B14801__Free_Trade")) %>%
+  inner_join(get_sentiments("bing"), by = "word")
+```
+
+```{r}
+raw_sentiment_summary <- sentiment_words_raw %>%
+  group_by(doc_title, sentiment) %>%
+  summarise(word_count = n(), .groups = "drop") %>%
+  pivot_wider(names_from = sentiment, values_from = word_count, values_fill = 0) %>%
+  mutate(net_sentiment_raw = positive - negative)
+
+print(raw_sentiment_summary)
+```
+
+```{r}
+
+corpus_dfm <- cleaned_tokens %>%
+  count(doc_title, word) %>%
+  cast_dfm(document = doc_title, term = word, value = n)
+
+corpus_tfidf <- dfm_tfidf(corpus_dfm)
+
+tfidf_tidy <- convert(corpus_tfidf, to = "data.frame") %>%
+  rename(doc_title = doc_id) %>%
+  pivot_longer(
+    cols = -doc_title,
+    names_to = "word",
+    values_to = "tfidf"
+  ) %>%
+  filter(tfidf > 0) %>%
+  filter(doc_title %in% c("A07594__Circle_of_Commerce", "B14801__Free_Trade"))
+
+sentiment_words_tfidf <- tfidf_tidy %>%
+  inner_join(get_sentiments("bing"), by = "word")
+
+top_sentiment_words <- sentiment_words_tfidf %>%
+  group_by(doc_title, sentiment) %>%
+  slice_max(tfidf, n = 5) %>%
+  ungroup()
+
+print(top_sentiment_words)
+
+tfidf_sentiment_summary <- sentiment_words_tfidf %>%
+  group_by(doc_title, sentiment) %>%
+  summarise(total_tfidf = sum(tfidf), .groups = "drop") %>%
+  pivot_wider(names_from = sentiment, values_from = total_tfidf, values_fill = 0) %>%
+  mutate(net_sentiment_tfidf = positive - negative)
+
+print(tfidf_sentiment_summary)
+```
+
+```{r}
+final_sentiment_comparison <- raw_sentiment_summary %>%
+  rename(
+    raw_negative = negative,
+    raw_positive = positive
+  ) %>%
+  left_join(
+    tfidf_sentiment_summary %>%
+      rename(
+        tfidf_negative = negative,
+        tfidf_positive = positive
+      ),
+    by = "doc_title"
+  )
+
+print(final_sentiment_comparison)
+
+write_csv(final_sentiment_comparison, "final_sentiment_comparison.csv")
+```
+
+```{r}
+tfidf_tidy <- convert(corpus_tfidf, to = "data.frame") %>%
+  rename(doc_title = doc_id) %>%
+  pivot_longer(
+    cols = -doc_title,
+    names_to = "word",
+    values_to = "tfidf"
+  ) %>%
+  filter(tfidf > 0) %>%
+  filter(doc_title %in% c("A07594__Circle_of_Commerce", "B14801__Free_Trade"))
+
+head(tfidf_tidy, 10)
+```
+
+```{r}
+sentiment_words_tfidf <- tfidf_tidy %>%
+  inner_join(get_sentiments("bing"), by = "word")
+
+top_sentiment_words <- sentiment_words_tfidf %>%
+  group_by(doc_title, sentiment) %>%
+  slice_max(order_by = tfidf, n = 5, with_ties = FALSE) %>%
+  ungroup()
+
+print(top_sentiment_words, n = 20)
+```
+
+```{r}
+tfidf_sentiment_summary <- sentiment_words_tfidf %>%
+    group_by(doc_title, sentiment) %>%
+  summarise(total_tfidf = sum(tfidf), .groups = "drop") %>%
+   pivot_wider(
+    names_from = sentiment, 
+    values_from = total_tfidf, 
+    values_fill = 0
+  ) %>%
+  mutate(net_sentiment_tfidf = positive - negative)
+
+print(tfidf_sentiment_summary)
+```
+
+```{r}
+final_sentiment_comparison <- raw_sentiment_summary %>%
+  rename(
+    raw_negative = negative,
+    raw_positive = positive
+  ) %>%
+  left_join(
+    tfidf_sentiment_summary %>%
+      rename(
+        tfidf_negative = negative,
+        tfidf_positive = positive
+      ),
+    by = "doc_title"
+  )
+
+print(final_sentiment_comparison)
+
+write_csv(final_sentiment_comparison, "final_sentiment_comparison.csv")
+```

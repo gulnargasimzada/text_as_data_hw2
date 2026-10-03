@@ -1,0 +1,3 @@
+doc_title,raw_negative,raw_positive,net_sentiment_raw,tfidf_negative,tfidf_positive,net_sentiment_tfidf
+A07594__Circle_of_Commerce,423,491,68,86.34899055,63.04383529,-23.30515527
+B14801__Free_Trade,281,344,63,44.19120716,32.69502966,-11.4961775
